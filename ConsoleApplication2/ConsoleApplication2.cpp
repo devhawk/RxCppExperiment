@@ -14,23 +14,25 @@ struct __declspec(uuid("6BDCAAC6-89E9-4CC1-BA48-FEA913F78502")) ISampleCallback 
 
 struct __declspec(uuid("A6858B62-1907-494F-9448-EDCFD64025EE")) ISampleClient : public IUnknown
 {
-    virtual HRESULT STDMETHODCALLTYPE Listen(_In_ ISampleCallback* pCallback) = 0;
-    virtual HRESULT STDMETHODCALLTYPE MakeRequestAsync(_Out_ uint64_t* requestId) = 0;
+    virtual HRESULT STDMETHODCALLTYPE Listen(_In_ ISampleCallback* callback) = 0;
+    virtual HRESULT STDMETHODCALLTYPE MakeRequestAsync(_In_ char const* message, _Out_ uint64_t* requestId) = 0;
 };
 
 struct SampleClient : public RuntimeClass<
     RuntimeClassFlags<RuntimeClassType::ClassicCom>,
     ISampleClient>
 {
-    HRESULT STDMETHODCALLTYPE Listen(_In_ ISampleCallback* pCallback) override
+    HRESULT STDMETHODCALLTYPE Listen(_In_ ISampleCallback* callback) override
     {
-        _callback = pCallback;
+        _callback = callback;
         return S_OK;
     }
 
-    HRESULT STDMETHODCALLTYPE MakeRequestAsync(_Out_ uint64_t* requestId) override
+    HRESULT STDMETHODCALLTYPE MakeRequestAsync(_In_ char const* message, _Out_ uint64_t* requestId) override
     {
         auto cur_request_id = ++_last_request_id;
+        printf("MakeRequestAsync %lld %s\n", cur_request_id, message);
+
         *requestId = cur_request_id;
         auto lambda = [this, cur_request_id]()
         {
@@ -96,12 +98,12 @@ HRESULT GetSampleClient(ISampleClient ** sample_client)
     return S_OK;
 }
 
-void make_request(ComPtr<ISampleClient> & client)
+void make_request(ComPtr<ISampleClient> & client, char const* message)
 {
     uint64_t request_id;
-    HRESULT hr = client->MakeRequestAsync(&request_id);
+    HRESULT hr = client->MakeRequestAsync(message, &request_id);
     if (FAILED(hr)) { throw std::exception("client->MakeRequestAsync", hr); }
-    printf("Made Request %lld\n", request_id);
+    printf("Made Request %s %lld\n", message, request_id);
 }
 
 int main()
@@ -124,9 +126,9 @@ int main()
         });
     }
 
-    make_request(client);
-    make_request(client);
-    make_request(client);
+    make_request(client, "foo");
+    make_request(client, "bar");
+    make_request(client, "baz");
 
     std::cin.get();
 }

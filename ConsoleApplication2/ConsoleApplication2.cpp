@@ -31,7 +31,7 @@ struct SampleClient : public RuntimeClass<
     HRESULT STDMETHODCALLTYPE MakeRequestAsync(_In_ char const* message, _Out_ uint64_t* requestId) override
     {
         auto cur_request_id = ++_last_request_id;
-        printf("MakeRequestAsync %lld %s\n", cur_request_id, message);
+        printf("SampleClient::MakeRequestAsync %lld %s\n", cur_request_id, message);
 
         *requestId = cur_request_id;
         auto lambda = [this, cur_request_id]()
@@ -70,14 +70,14 @@ private:
 
     HRESULT STDMETHODCALLTYPE OnComplete(_In_ HRESULT result, uint64_t requestId) override
     {
-        printf("OnComplete %lld %ld\n", requestId, result);
+        printf("SampleCallback::OnComplete %lld %ld\n", requestId, result);
         _subscriber.on_next(std::make_tuple(requestId, result));
         return S_OK;
     }
 
     HRESULT STDMETHODCALLTYPE OnError(_In_ HRESULT result, uint64_t requestId) override
     {
-        printf("OnError %lld %ld\n", requestId, result);
+        printf("SampleCallback::OnError %lld %ld\n", requestId, result);
         _subscriber.on_next(std::make_tuple(requestId, result));
         return S_OK;
     }
@@ -103,7 +103,6 @@ void make_request(ComPtr<ISampleClient> & client, char const* message)
     uint64_t request_id;
     HRESULT hr = client->MakeRequestAsync(message, &request_id);
     if (FAILED(hr)) { throw std::exception("client->MakeRequestAsync", hr); }
-    printf("Made Request %s %lld\n", message, request_id);
 }
 
 int main()

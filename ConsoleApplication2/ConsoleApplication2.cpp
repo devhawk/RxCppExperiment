@@ -34,7 +34,7 @@ struct SampleClient : public RuntimeClass<
         *requestId = cur_request_id;
         auto lambda = [this, cur_request_id]()
         {
-            std::this_thread::sleep_for(2s);
+            std::this_thread::sleep_for(cur_request_id * 1s);
 
             if (_callback)
             {
@@ -55,17 +55,30 @@ struct SampleCallback : public RuntimeClass<
     RuntimeClassFlags<RuntimeClassType::ClassicCom>,
     ISampleCallback>
 {
+    SampleCallback(rxcpp::subscriber<std::tuple<uint64_t, HRESULT>> subscriber)
+        : _subscriber(subscriber)
+    {
+    }
+
+    ~SampleCallback()
+    {
+        _subscriber.on_completed();
+    }
+
     HRESULT STDMETHODCALLTYPE OnComplete(_In_ HRESULT result, uint64_t requestId) override
     {
-        printf("OnComplete %lld %ld\n", requestId, result);
+        _subscriber.on_next(std::make_tuple(requestId, result));
         return S_OK;
     }
 
     HRESULT STDMETHODCALLTYPE OnError(_In_ HRESULT result, uint64_t requestId) override
     {
-        printf("OnError %lld %ld\n", requestId, result);
+        _subscriber.on_next(std::make_tuple(requestId, result));
         return S_OK;
     }
+
+private:
+    rxcpp::subscriber<std::tuple<uint64_t, HRESULT>> _subscriber;
 };
 
 HRESULT GetSampleClient(ISampleClient ** sample_client)
@@ -89,15 +102,21 @@ int main()
     HRESULT hr = GetSampleClient(client.GetAddressOf());
     if (FAILED(hr)) { throw std::exception("GetSampleClient", hr); }
 
-    ComPtr<ISampleCallback> callback = Make<SampleCallback>();
+    rxcpp::subjects::subject<std::tuple<uint64_t, HRESULT>> subject;
+
+    ComPtr<ISampleCallback> callback = Make<SampleCallback>(subject.get_subscriber());
     hr = client->Listen(callback.Get());
     if (FAILED(hr)) { throw std::exception("client->Listen", hr); }
     callback.Reset();
 
-    make_request(client);
-    make_request(client);
-    make_request(client);
+    subject.get_observable().subscribe([](std::tuple<uint64_t, HRESULT> t)
+    {
+        printf("OnNext %lld %ld\n", std::get<0>(t), std::get<1>(t));
+    });
 
+    make_request(client);
+    make_request(client);
+    make_request(client);
 
     std::cin.get();
 }

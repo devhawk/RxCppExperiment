@@ -10,5 +10,5 @@
 #include <stdio.h>
 #include <tchar.h>
 
-#include <rxcpp\rx.hpp>
+#include "rx.hpp"
 #include <wrl.h>
